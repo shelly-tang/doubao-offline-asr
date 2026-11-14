@@ -1,0 +1,147 @@
+[
+  {
+    "base": 1591139,
+    "size": 33089600,
+    "md5": "6ee06b1f384134b8503bb2de2ce930a8",
+    "ops": {
+      "Qw4EmbeddingLogit": 1
+    },
+    "component": "stream_embedding_logit"
+  },
+  {
+    "base": 34680739,
+    "size": 208533328,
+    "md5": "75061fa52e70f573b0b0688fa5ab0576",
+    "ops": {
+      "QuantizeLinear": 3,
+      "Unsqueeze": 7,
+      "Memcpy": 1,
+      "QConvInt8": 1,
+      "QConv": 1,
+      "Shape": 4,
+      "Gather": 7,
+      "Mul": 3,
+      "Transpose": 1,
+      "Concat": 2,
+      "Reshape": 2,
+      "QGemm": 2,
+      "QW4ConformerLayerRopeChunk": 24,
+      "LayerNormalization": 1,
+      "Div": 1,
+      "Add": 1,
+      "Slice": 1
+    },
+    "component": "stream_encoder"
+  },
+  {
+    "base": 243214067,
+    "size": 76644680,
+    "md5": "268f058abcc12ba2f2131ef09e315c68",
+    "ops": {
+      "W4A8GPT2TransformerBlock": 12,
+      "LayerNormalization": 1
+    },
+    "component": "stream_gpt2_decoder"
+  },
+  {
+    "base": 319858747,
+    "size": 32627552,
+    "md5": "2b62ead5d58e6fa66d59cafcc4360b20",
+    "ops": {
+      "FusedGemm": 1,
+      "W4A8ImeAsrQwen3TransformerBlock": 2,
+      "Pow": 1,
+      "ReduceMean": 1,
+      "Add": 1,
+      "Sqrt": 1,
+      "Div": 1,
+      "Mul": 2
+    },
+    "component": "nonstream_draft"
+  },
+  {
+    "base": 352486299,
+    "size": 206124592,
+    "md5": "f838d414b5f3f465fb3ed165cf3f5dc7",
+    "ops": {
+      "Unsqueeze": 7,
+      "Memcpy": 1,
+      "FusedConv": 2,
+      "Relu": 2,
+      "Shape": 4,
+      "Gather": 7,
+      "Mul": 5,
+      "Transpose": 1,
+      "Concat": 2,
+      "Reshape": 2,
+      "Qw4DynGemm": 2,
+      "QW4ConformerLayerRopeChunk": 24,
+      "ReduceMean": 2,
+      "Sub": 1,
+      "Pow": 1,
+      "Add": 2,
+      "Sqrt": 1,
+      "Div": 2,
+      "Slice": 1
+    },
+    "component": "nonstream_encoder"
+  },
+  {
+    "base": 558610891,
+    "size": 33025424,
+    "md5": "9beee631e16a50672e62c69bbb71e55a",
+    "ops": {
+      "Qw4EmbeddingLogit": 1
+    },
+    "component": "nonstream_embedding_logit"
+  },
+  {
+    "base": 591636315,
+    "size": 2106368,
+    "md5": "3168879ba5dcd4ddcd4fa19a63772b75",
+    "ops": {
+      "QwGather": 1
+    },
+    "component": "stream_position_embedding"
+  },
+  {
+    "base": 593742683,
+    "size": 230098144,
+    "md5": "083d4717b9648369083c42cf72cb3a15",
+    "ops": {
+      "W4A8ImeAsrQwen3TransformerBlock": 28,
+      "Pow": 1,
+      "ReduceMean": 1,
+      "Add": 1,
+      "Sqrt": 1,
+      "Div": 1,
+      "Mul": 2,
+      "Shape": 1,
+      "Gather": 1,
+      "Sub": 1,
+      "Unsqueeze": 1,
+      "Slice": 1
+    },
+    "component": "nonstream_qwen3_decoder"
+  },
+  {
+    "base": 823844005,
+    "size": 1155400,
+    "md5": "9cf6a7fe3237431aca988c4cf4ca4bbd",
+    "ops": {
+      "Slice": 6,
+      "Reshape": 6,
+      "FusedConv": 1,
+      "MaxPool": 1,
+      "SLSTM": 3,
+      "Concat": 2,
+      "BatchNormalization": 2,
+      "Squeeze": 2,
+      "Gemm": 2,
+      "Unsqueeze": 2,
+      "Relu": 1,
+      "Sigmoid": 1
+    },
+    "component": "vad"
+  }
+]

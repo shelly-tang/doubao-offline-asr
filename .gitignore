@@ -1,0 +1,14 @@
+Frameworks/
+*.bundle
+*.model
+*.dylib
+run
+probe
+*.pcm
+*.wav
+*.aiff
+*.log
+offline.sb
+__pycache__/
+.venv/
+.DS_Store
