@@ -9,7 +9,8 @@ from model_source import SafeModel
 ROOT = Path(__file__).resolve().parent
 RUNTIME = ['decoder.py', 'encoder.py', 'features.py', 'model_source.py',
            'quantization.py', 'text.py', 'transcribe.py', 'web_server.py',
-           'offline.sb', 'requirements.txt']
+           'offline.sb', 'requirements.txt', 'streaming.py', 'stream_session.py',
+           'stream_worker.py', 'stream_server.py', 'stream.html', 'benchmark_stream.py']
 
 
 def package(model_path, output):

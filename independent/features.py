@@ -16,8 +16,8 @@ def read_wav(path):
         return audio
 
 
-def fbank(audio, pack):
-    audio = np.pad(audio,(0,2560))  # observed finish_pad_wav_ms=160
+def fbank(audio, pack, pad_samples=2560):
+    audio = np.pad(audio,(0,pad_samples))  # observed finish_pad_wav_ms=160
     frames = np.lib.stride_tricks.sliding_window_view(audio,400)[::160].copy()
     frames -= frames.mean(axis=-1,keepdims=True)
     frames[:,1:] -= .97*frames[:,:-1].copy()

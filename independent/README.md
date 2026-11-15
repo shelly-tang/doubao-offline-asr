@@ -1,6 +1,6 @@
 # 独立 MLX 推理实验版
 
-这个目录直接读取原版权重，用 NumPy + MLX 实现音频到文字的非流式推理。**运行时不加载豆包输入法、`runtime.bundle`、`helper.dylib` 或私有 Frameworks。** 它不是根目录旧版私有运行库的另一层包装。
+这个目录直接读取原版权重，用 NumPy + MLX 实现音频到文字的非流式推理，并提供可选的实验性流式路径。**运行时不加载豆包输入法、`runtime.bundle`、`helper.dylib` 或私有 Frameworks。** 它不是根目录旧版私有运行库的另一层包装。
 
 目前完成的是短音频端到端原型。两段中文合成语音已正确识别，两秒静音输出为空；这不代表真人、噪声、长音频和逐算子数值一致性已经通过验证。
 
@@ -22,7 +22,7 @@ independent/.venv/bin/python independent/export.py
 independent/.venv/bin/python independent/export.py --pack independent/plain.model
 ```
 
-[完整 safetensors 格式与验证说明](SAFETENSORS.md)。默认包含全部九个子模型；`--scope nonstream` 可选择约 470.8 MB 的三组件子集。完整导出不等于实现流式推理，当前录音路径仍为非流式。
+[完整 safetensors 格式与验证说明](SAFETENSORS.md)。默认包含全部九个子模型；`--scope nonstream` 可选择约 470.8 MB 的三组件子集。默认录音路径为非流式；新增实验性 `--streaming` 入口，需完整导出的流式组件。
 
 [复制到未安装豆包的 Mac：部署说明](DEPLOYMENT.md)。
 
@@ -32,7 +32,7 @@ independent/.venv/bin/python independent/export.py --pack independent/plain.mode
 independent/.venv/bin/python independent/web_server.py
 ```
 
-打开 <http://localhost:8766>，点击开始录音，再停止识别。建议 5–15 秒；页面 17 秒自动停止，后端最多接受 18 秒。麦克风必须由用户授权并主动开始录音。界面仍使用原项目的录音组件，但识别后端全部换成独立 MLX。没有接入 VAD 自动断句，也没有边说边出字。
+打开 <http://localhost:8766>，点击开始录音，再停止识别。建议 5–15 秒；页面 17 秒自动停止，后端最多接受 18 秒。麦克风必须由用户授权并主动开始录音。界面仍使用原项目的录音组件，但识别后端全部换成独立 MLX。没有接入 VAD 自动断句，默认模式停止后识别。若要边说边出字，在启动命令后加 `--streaming`；准确率仍有明显问题，详见 [流式实现、使用与实测](STREAMING.md)。
 
 命令行（单声道、16 kHz、PCM16 WAV）：
 
@@ -75,7 +75,8 @@ MLX 自己及 macOS 的 Metal 等系统库当然仍然参与运算；这里排�
 | 编码器 | 两层卷积、24 层 Conformer、四帧拼接和音频投影 | 两段合成语音端到端正确；分块边界/量化注意力尚未逐层校验 |
 | 解码器 | 28 层、RMSNorm、Q/K norm、GQA、RoPE、SiLU、KV cache | FP32 整段与逐 token 最大差值约 5.5e-5 |
 | 词表与提示词 | 本地 BPE、原包 default prompt、音频嵌入插入 | 数字 ITN 标注可解析为阿拉伯数字 |
-| 草稿解码器、流式、VAD | 未接入 | 当前直接用主解码器逐 token 生成 |
+| 流式编码器和解码器 | 独立增量 MLX、跨块缓存、常驻工作进程 | 分包一致性通过；仍有明显识别错误，见 STREAMING.md |
+| 草稿解码器、VAD | 未接入 | 非流式当前直接用主解码器逐 token 生成 |
 
 解码器结构与 Qwen3 类似，但这些结果仍不能证明权重来源是某个官方 Qwen3 checkpoint。
 
@@ -97,7 +98,7 @@ independent/.venv/bin/python independent/smoke.py independent/exported-model --f
 
 ## 限制
 
-当前最多 18 秒，尚未验证长音频跨块状态；不保证与原版完全相同。没有系统输入框上下文、历史对话、改词记录采集；提示词中的这些字段填空。网页每次请求重新加载模型。后续需要逐层比较中间张量、补充真人与噪声样本、验证长音频，再考虑常驻模型和低精度优化。
+当前最多 18 秒，尚未验证长音频跨块状态；不保证与原版完全相同。没有系统输入框上下文、历史对话、改词记录采集；提示词中的这些字段填空。默认非流式网页每次请求重新加载模型；流式入口模型常驻。后续需要逐层比较中间张量、补充真人与噪声样本、验证长音频，继续完善流式数值对齐和低精度优化。
 
 公开内容只有实现代码。不提交权重、原二进制、私有库或其中的算子源码；生成的 `.model`、`.npy`、`.npz`、`.safetensors` 均已加入忽略规则。
 
