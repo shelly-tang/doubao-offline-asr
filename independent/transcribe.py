@@ -2,20 +2,20 @@
 import argparse,json,time,sys
 import numpy as np
 import mlx.core as mx
-from weights import Pack
+from model_source import open_model
 from features import fbank,read_wav
 from encoder import Encoder
 from decoder import Decoder
 from text import tokenizer,prompt_parts
 
 ap=argparse.ArgumentParser()
-ap.add_argument('pack');ap.add_argument('wav');ap.add_argument('--max-tokens',type=int,default=100)
+ap.add_argument('pack', metavar='MODEL', help='Standalone safetensors directory or local FLUTE v1 pack');ap.add_argument('wav');ap.add_argument('--max-tokens',type=int,default=100)
 ap.add_argument('--json',action='store_true',help='Only JSON result on stdout')
 ap.add_argument('--audio-embeddings',help='Debug: load previously saved local encoder output')
 ap.add_argument('--save-audio-embeddings',help='Debug: save locally; ignored by git')
 a=ap.parse_args()
 if not 1<=a.max_tokens<=512:ap.error('--max-tokens must be between 1 and 512')
-start=time.perf_counter();pack=Pack(a.pack)
+start=time.perf_counter();pack=open_model(a.pack)
 tok=tokenizer(pack)
 model_load=0.0
 if a.audio_embeddings:

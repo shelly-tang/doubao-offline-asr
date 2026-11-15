@@ -5,7 +5,7 @@ FP32 weights/activations intentionally isolate layout errors from FP16 rounding.
 """
 import numpy as np
 import mlx.core as mx
-from weights import unpack_q4
+from quantization import unpack_q4
 
 
 def rms(x, weight, eps=1e-5):

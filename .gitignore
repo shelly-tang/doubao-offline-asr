@@ -16,3 +16,7 @@ __pycache__/
 *.safetensors
 *.npy
 !independent/offline.sb
+
+# Local exported weights, tokenizer, prompts and model metadata
+exported-model/
+.export-*/

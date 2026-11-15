@@ -13,19 +13,19 @@
 
 提取与推理是两个阶段：
 
-1. **一次性提取**：`independent/extract.py` 读取本机安装的程序与模型，校验版本哈希，恢复 payload 的 XOR 混淆，重新封装为本地 `plain.model`。该过程不执行原程序、不生成或加载 `runtime.bundle`。
-2. **独立读取**：`independent/weights.py` 解析 FLUTE 目录和 Panther FlatBuffer，读取原始张量并解包有符号 INT4 权重。
+1. **一次性提取**：导出器调用 `independent/extract.py` 读取本机安装的程序与模型，校验版本哈希，恢复 payload 的 XOR 混淆。中间 `plain.model` 放在临时目录，转换完成后自动清理。该过程不执行原程序、不生成或加载 `runtime.bundle`。
+2. **无损转换**：`independent/export.py` 将非流式路径所需张量写入三个 safetensors 文件，同时保存图配置、词表、提示词和 CMVN。逐张量校验 dtype、shape 和字节完全一致；运行时由 `model_source.py` 直接加载导出目录，不解析或读取 FLUTE。
 3. **独立计算**：NumPy 完成音频特征提取，MLX 执行两层卷积、24 层 Conformer、音频投影及 28 层主解码器。BPE 词表和提示模板从本地包读取，最后处理数字转写标注。
 
 ```text
-本机豆包安装文件 ──只读提取──> 本地 plain.model
+本机豆包安装文件 ──提取/转换──> exported-model/（safetensors + 配置）
                                       │
 录音 ──> NumPy 特征提取 ──> MLX 编码器 ──> MLX 解码器 ──> 文字
 ```
 
 推理时不需要输入法进程或原安装目录，也不调用豆包服务。网页的推理子进程在沙箱内运行，禁止联网及读取原输入法、`runtime.bundle`、`helper.dylib` 和旧版私有 Frameworks。MLX 和 macOS Metal 系统库仍是运行依赖。
 
-**独立的是推理实现，模型参数仍来自豆包。** 当前使用的 `plain.model` 是本地重新封装的原权重。今后可转换为 safetensors 等标准格式，转换后不必保留 FLUTE 包，但参数来源与许可不会改变；当前仓库尚未提供该标准格式导出器。若连参数来源也要独立，需要使用许可合适的其他模型或另行训练。
+**独立的是推理实现和运行容器，模型参数仍来自豆包。** 导出后只需 `exported-model/`，不再需要原安装文件或任何 FLUTE 包；转换不改变参数来源或再分发权限。若连参数来源也要独立，需要使用许可合适的其他模型或另行训练。导出保留自定义 INT4 排列，并非可以直接交给 Transformers 的标准 Qwen3 checkpoint。
 
 本原型将 INT4 解包为 FP32，使用浮点激活；尚未完成与原库整数算子的逐层数值对齐，不保证结果或内存占用与原版一致。草稿解码器、流式路径和 VAD 尚未接入独立版。
 
@@ -38,18 +38,18 @@ git clone https://github.com/shelly-tang/doubao-offline-asr.git
 cd doubao-offline-asr
 python3 -m venv independent/.venv
 independent/.venv/bin/python -m pip install -r independent/requirements.txt
-independent/.venv/bin/python independent/extract.py
+independent/.venv/bin/python independent/export.py
 independent/.venv/bin/python independent/web_server.py
 ```
 
 打开 <http://localhost:8766>，允许麦克风后点击开始录音。建议 5–15 秒，页面在 17 秒自动停止，后端最多接受 18 秒。停止后显示识别结果、加载时间和处理时间。每次请求重新加载模型；没有 VAD 自动断句或边说边出字。
 
-提取结果是约 825 MB 的 `independent/plain.model`。脚本拒绝覆盖已有文件；已经成功提取过就跳过提取步骤。依赖安装需要联网，模型不从远程下载。独立版不需要执行根目录的 `prepare.py`、`repack.py` 或 `build.py`。
+默认导出目录是约 470.8 MB 的 `independent/exported-model/`，包含三个 safetensors、JSON 图配置和文本资产。脚本拒绝覆盖已有目录；已经成功导出过就跳过导出步骤。旧用户可通过 `independent/export.py --pack independent/plain.model` 直接转换已有包。依赖安装需要联网，模型不从远程下载。独立版不需要执行根目录的 `prepare.py`、`repack.py` 或 `build.py`。
 
 命令行接受单声道 16 kHz PCM16 WAV：
 
 ```sh
-independent/.venv/bin/python independent/transcribe.py independent/plain.model input.wav
+independent/.venv/bin/python independent/transcribe.py independent/exported-model input.wav
 ```
 
 [完整独立版文档](independent/README.md)包含采样率转换、禁止私有库访问的验证命令、缓存一致性检查、实现文件和限制说明。
@@ -66,6 +66,20 @@ independent/.venv/bin/python independent/transcribe.py independent/plain.model i
 | 两秒全零 PCM | 空文本 | 约 1.92 秒，含加载 |
 
 第二段和静音测试在禁止联网、读取豆包程序及私有库的沙箱中完成。28 层解码器的 FP32 整段输入与逐 token 缓存计算最大差值约 `5.5e-5`，这是本实现内部一致性检查，不是与豆包原库的对齐结果。提取包与旧版 plaintext pack 的 SHA-256 一致，九个子模型的张量尺寸检查通过。
+
+### safetensors 转换一致性（2026-11-15）
+
+本机提取并转换后，1,314 个张量的 dtype、shape、字节内容逐一一致。使用同样两段合成语音和两秒静音比较两种加载路径：
+
+| 样本 | 生成 token 数 | token ID / 原始文字 / 最终文字 | 编码器最大绝对误差 |
+|---|---:|---|---:|
+| 开会与材料 | 47 | 完全一致 | 0 |
+| 雨伞与图书馆 | 35 | 完全一致 | 0 |
+| 两秒静音 | 0 | 完全一致 | 0 |
+
+safetensors 路径测试额外禁止读取所有 `.model` 文件，仍正常完成。另有 5 项无权重格式测试通过，覆盖损坏文件、缺失资产、版本检查等。以上证明本次转换保持已有 MLX 路径行为，不表示与豆包原库逐算子等价，也不代表真人准确率评测。
+
+[导出格式、可复现验证命令与迁移说明](independent/SAFETENSORS.md)。公开提交只包含代码和说明，不包含导出目录、词表、提示模板或权重。
 
 ## 原运行库版本与模型解析资料
 

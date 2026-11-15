@@ -11,10 +11,18 @@
 ```sh
 python3 -m venv independent/.venv
 independent/.venv/bin/python -m pip install -r independent/requirements.txt
-independent/.venv/bin/python independent/extract.py
+independent/.venv/bin/python independent/export.py
 ```
 
-提取脚本只读取本机已安装的豆包程序和模型文件，不执行其中的代码。它检查程序与模型的 SHA-256，只支持此前分析的版本（模型目录 `1_8`）。输出 `independent/plain.model`，约 825 MB；如果已存在会拒绝覆盖。提取后，推理只需要这个文件和本目录代码、Python 依赖，不再读取原始安装目录。
+导出器只读取本机已安装的程序和模型文件，不执行其中代码。它检查 SHA-256，只支持此前分析的版本（模型目录 `1_8`）。默认从安装中提取临时包，导出约 470.8 MB 的 `independent/exported-model/` 后自动清理临时包；输出目录已存在会拒绝覆盖。运行只需导出目录、代码和 Python 依赖，不再需要 FLUTE 包或原始安装目录。
+
+已持有旧版 plaintext pack 的用户也可运行：
+
+```sh
+independent/.venv/bin/python independent/export.py --pack independent/plain.model
+```
+
+[完整 safetensors 格式与验证说明](SAFETENSORS.md)。
 
 录音界面：
 
@@ -27,7 +35,7 @@ independent/.venv/bin/python independent/web_server.py
 命令行（单声道、16 kHz、PCM16 WAV）：
 
 ```sh
-independent/.venv/bin/python independent/transcribe.py independent/plain.model input.wav
+independent/.venv/bin/python independent/transcribe.py independent/exported-model input.wav
 ```
 
 其他采样率可先用 macOS 自带工具转换：
@@ -49,7 +57,7 @@ sandbox-exec \
   -D DOUBAO_DATA="$HOME/Library/Application Support/DoubaoIme" \
   -D PRIVATE_FRAMEWORKS="$PWD/Frameworks" \
   -f independent/offline.sb \
-  independent/.venv/bin/python independent/transcribe.py independent/plain.model input-16k.wav
+  independent/.venv/bin/python independent/transcribe.py independent/exported-model input-16k.wav
 ```
 
 MLX 自己及 macOS 的 Metal 等系统库当然仍然参与运算；这里排除的是豆包的私有推理实现。模型提取阶段需要读取本机安装文件，推理阶段不需要。
@@ -82,7 +90,7 @@ MLX 自己及 macOS 的 Metal 等系统库当然仍然参与运算；这里排�
 `smoke.py` 检查解码器有限输出与缓存一致性，不测试语音准确率：
 
 ```sh
-independent/.venv/bin/python independent/smoke.py independent/plain.model --float-activations
+independent/.venv/bin/python independent/smoke.py independent/exported-model --float-activations
 ```
 
 ## 限制
@@ -96,7 +104,9 @@ independent/.venv/bin/python independent/smoke.py independent/plain.model --floa
 | 文件 | 用途 |
 |---|---|
 | `extract.py` | 只读提取本机权重；校验原文件哈希 |
-| `weights.py` | 容器、图与张量解析，INT4 解包 |
+| `export.py` / `model_source.py` | 无损 safetensors 导出与直接加载 |
+| `weights.py` / `quantization.py` | 旧容器解析（提取/兼容路径）与独立 INT4 解包 |
+| `verify_export.py` / `test_model_source.py` | 实际音频转换一致性与格式/完整性检查 |
 | `features.py` / `encoder.py` | 音频特征与 Conformer 编码器 |
 | `decoder.py` / `text.py` | 主解码器、BPE、提示词和数字标注处理 |
 | `transcribe.py` | 短音频命令行入口，输出 JSON |
@@ -105,4 +115,4 @@ independent/.venv/bin/python independent/smoke.py independent/plain.model --floa
 
 ## 是否可以不再保留豆包模型包
 
-提取后运行不再需要原始下载的 `asr_model.model` 或原安装目录，但仍需要本地 `plain.model`。可进一步把张量和配置导出为 safetensors 等标准格式，让推理也脱离 FLUTE 容器；当前尚未实现该导出器。这是格式转换，不是重新训练，不改变参数来源或再分发权限。要完全摆脱豆包参数，需要替换为许可合适的模型或自行训练。
+可以。转换完成后，推理只使用 `exported-model/`；导出目录缺失或损坏会直接报错，不会回退读取原包。词表、提示词、CMVN 都包含在导出目录中。FLUTE 读取仅保留作旧版兼容与对比验证。参数仍来自原模型，转换不改变来源和许可；当前并非重新训练的模型。

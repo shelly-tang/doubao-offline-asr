@@ -3,7 +3,7 @@ Chunk/state and quantized-attention parity are not yet established.
 """
 import numpy as np
 import mlx.core as mx
-from weights import unpack_q4
+from quantization import unpack_q4
 
 
 def layernorm(x, combined, eps=1e-5):

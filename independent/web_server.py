@@ -47,8 +47,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
   except Exception as e:self.reply(500,{'error':str(e)})
   finally:LOCK.release()
 if __name__=='__main__':
- ap=argparse.ArgumentParser();ap.add_argument('--pack',type=pathlib.Path,default=ROOT/'plain.model');ap.add_argument('--port',type=int,default=8766);args=ap.parse_args()
+ ap=argparse.ArgumentParser();ap.add_argument('--model', '--pack', dest='pack', type=pathlib.Path, default=ROOT/'exported-model', help='Exported model directory or legacy local FLUTE pack');ap.add_argument('--port',type=int,default=8766);args=ap.parse_args()
  PACK=args.pack.resolve();PORT=args.port
- if not PACK.is_file():ap.error('找不到模型，请先运行 independent/extract.py 或指定 --pack')
+ if not (PACK.is_file() or (PACK/'model.json').is_file()):ap.error('找不到模型，请先运行 independent/export.py 或指定 --model')
  print(f'独立 MLX 录音测试：http://localhost:{PORT}',flush=True)
  http.server.ThreadingHTTPServer(('127.0.0.1',PORT),Handler).serve_forever()
