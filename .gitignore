@@ -12,3 +12,7 @@ offline.sb
 __pycache__/
 .venv/
 .DS_Store
+*.npz
+*.safetensors
+*.npy
+!independent/offline.sb

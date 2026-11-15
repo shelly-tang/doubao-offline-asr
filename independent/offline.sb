@@ -1,0 +1,8 @@
+(version 1)
+(allow default)
+(deny network*)
+(deny file-read* file-write* (subpath "/Library/Input Methods/DoubaoIme.app"))
+(deny file-read* file-write* (subpath (param "DOUBAO_DATA")))
+(deny file-read* (regex #".*runtime[.]bundle.*"))
+(deny file-read* (regex #".*helper[.]dylib.*"))
+(deny file-read* (subpath (param "PRIVATE_FRAMEWORKS")))
