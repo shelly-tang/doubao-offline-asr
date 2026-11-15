@@ -1,6 +1,6 @@
 # 从本机权重导出独立 safetensors 模型
 
-导出器将已安装版本中的非流式编码器、主解码器和共享 embedding/logit 权重，连同运行必需的配置，转换成独立目录。转换完成后，不需要 `asr_model.model`、`plain.model`、输入法安装目录或私有推理库。默认导出过程只读原安装文件，临时 plaintext pack 会自动清理，不删除使用者原来的文件。
+导出器默认将已安装版本中的全部九个子模型，连同运行必需的配置，转换成独立目录。转换完成后，不需要 `asr_model.model`、`plain.model`、输入法安装目录或私有推理库。默认导出过程只读原安装文件，临时 plaintext pack 会自动清理，不删除使用者原来的文件。
 
 ## 导出与运行
 
@@ -21,6 +21,8 @@ independent/.venv/bin/python independent/web_server.py
 independent/.venv/bin/python independent/export.py --pack independent/plain.model
 ```
 
+仅导出当前非流式运行需要的三个子模型可加 `--scope nonstream`。已有三组件导出目录不会被覆盖；要补齐流式等权重，请指定一个新目录，例如 `--output independent/exported-model-full`。
+
 自定义目标目录（已存在时拒绝覆盖）：
 
 ```sh
@@ -37,6 +39,12 @@ independent/.venv/bin/python independent/web_server.py --model /path/to/my-model
 | `encoder.safetensors` | 793 个张量，卷积前端、24 层 Conformer 和音频投影 |
 | `decoder.safetensors` | 517 个张量，28 层主解码器及归一化参数 |
 | `embedding.safetensors` | 4 个张量，共享 token embedding / logit 权重等 |
+| `stream_encoder.safetensors` | 1,089 个张量，流式 Conformer 编码器 |
+| `stream_decoder.safetensors` | 294 个张量，12 层流式解码器 |
+| `stream_embedding.safetensors` | 6 个张量，流式 embedding/logit |
+| `stream_position.safetensors` | 3 个张量，流式位置嵌入 |
+| `draft.safetensors` | 46 个张量，草稿解码器 |
+| `vad.safetensors` | 28 个张量，VAD 网络 |
 | `*.graph.json` | 节点输入名、属性等现有 Python 实现所需图配置 |
 | `model.json` | 格式版本、量化布局标记、组件/资产索引、文件 SHA-256 与大小 |
 | `vocab.txt`、`merges.txt`、`add_special_tokens.txt` | 本地 BPE 词表及特殊 token |
@@ -44,7 +52,7 @@ independent/.venv/bin/python independent/web_server.py --model /path/to/my-model
 | `cmvn.txt`、`fbank.conf` | 音频前端资产 |
 | `.gitignore` | 忽略该目录全部内容，避免误上传权重及衍生资产 |
 
-本次导出总大小约 **470.8 MB**（约 449 MiB）。只导出当前非流式运行路径；流式模型、草稿模型和 VAD 未导出。模型配置中保留的 `.pthlite` 名称只是逻辑索引，不会打开这些文件。
+完整导出总大小约 **824.9 MB**（约 786.7 MiB），共 **2,780 个张量**；`--scope nonstream` 子集约 470.8 MB（约 449 MiB），共 1,314 个张量。当前 Python/MLX 推理只使用非流式的三个子模型；其他六个已无损导出，但暂不能用于本项目中的流式识别或 VAD。模型配置中保留的 `.pthlite` 名称只是逻辑索引，不会打开这些文件。
 
 每个权重张量保留原 dtype、shape 和字节；INT4 依然是带符号 nibble 打包的 INT8 数组，并保存原缩放系数。没有重新量化，也没有把存储膨胀为 FP32。加载后继续由现有 MLX 实现解包为 FP32 计算，与转换前算法相同。
 
@@ -54,7 +62,7 @@ independent/.venv/bin/python independent/web_server.py --model /path/to/my-model
 
 ## 转换验证
 
-导出时自动回读每个 safetensors，对全部 1,314 个张量检查名称、dtype、shape、逐字节内容；任何差异会中止。先在临时目录完成所有文件，最后才生成目标目录，避免中断留下半成品。
+导出时自动回读每个 safetensors，对全部选定张量（完整导出为 2,780 个）检查名称、dtype、shape、逐字节内容；任何差异会中止。先在临时目录完成所有文件，最后才生成目标目录，避免中断留下半成品。
 
 可复现的实际音频对比：
 

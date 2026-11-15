@@ -14,7 +14,7 @@
 提取与推理是两个阶段：
 
 1. **一次性提取**：导出器调用 `independent/extract.py` 读取本机安装的程序与模型，校验版本哈希，恢复 payload 的 XOR 混淆。中间 `plain.model` 放在临时目录，转换完成后自动清理。该过程不执行原程序、不生成或加载 `runtime.bundle`。
-2. **无损转换**：`independent/export.py` 将非流式路径所需张量写入三个 safetensors 文件，同时保存图配置、词表、提示词和 CMVN。逐张量校验 dtype、shape 和字节完全一致；运行时由 `model_source.py` 直接加载导出目录，不解析或读取 FLUTE。
+2. **无损转换**：`independent/export.py` 默认将全部九个子模型写入独立 safetensors 文件，同时保存图配置、词表、提示词和 CMVN。逐张量校验 dtype、shape 和字节完全一致；运行时由 `model_source.py` 直接加载导出目录，不解析或读取 FLUTE。
 3. **独立计算**：NumPy 完成音频特征提取，MLX 执行两层卷积、24 层 Conformer、音频投影及 28 层主解码器。BPE 词表和提示模板从本地包读取，最后处理数字转写标注。
 
 ```text
@@ -27,7 +27,7 @@
 
 **独立的是推理实现和运行容器，模型参数仍来自豆包。** 导出后只需 `exported-model/`，不再需要原安装文件或任何 FLUTE 包；转换不改变参数来源或再分发权限。若连参数来源也要独立，需要使用许可合适的其他模型或另行训练。导出保留自定义 INT4 排列，并非可以直接交给 Transformers 的标准 Qwen3 checkpoint。
 
-本原型将 INT4 解包为 FP32，使用浮点激活；尚未完成与原库整数算子的逐层数值对齐，不保证结果或内存占用与原版一致。草稿解码器、流式路径和 VAD 尚未接入独立版。
+本原型将 INT4 解包为 FP32，使用浮点激活；尚未完成与原库整数算子的逐层数值对齐，不保证结果或内存占用与原版一致。草稿解码器、流式路径和 VAD 的权重已可完整导出，但其推理逻辑尚未接入独立版。
 
 ## 独立 MLX 安装与录音
 
@@ -44,7 +44,7 @@ independent/.venv/bin/python independent/web_server.py
 
 打开 <http://localhost:8766>，允许麦克风后点击开始录音。建议 5–15 秒，页面在 17 秒自动停止，后端最多接受 18 秒。停止后显示识别结果、加载时间和处理时间。每次请求重新加载模型；没有 VAD 自动断句或边说边出字。
 
-默认导出目录是约 470.8 MB 的 `independent/exported-model/`，包含三个 safetensors、JSON 图配置和文本资产。脚本拒绝覆盖已有目录；已经成功导出过就跳过导出步骤。旧用户可通过 `independent/export.py --pack independent/plain.model` 直接转换已有包。依赖安装需要联网，模型不从远程下载。独立版不需要执行根目录的 `prepare.py`、`repack.py` 或 `build.py`。
+默认完整导出目录是约 824.9 MB 的 `independent/exported-model/`，包含九个 safetensors、JSON 图配置和文本资产。使用 `--scope nonstream` 可只导出当前运行所需三个子模型（约 470.8 MB）。脚本拒绝覆盖已有目录；已经成功导出过就跳过导出步骤。旧用户可通过 `independent/export.py --pack independent/plain.model` 直接转换已有包。依赖安装需要联网，模型不从远程下载。独立版不需要执行根目录的 `prepare.py`、`repack.py` 或 `build.py`。
 
 命令行接受单声道 16 kHz PCM16 WAV：
 
@@ -69,7 +69,7 @@ independent/.venv/bin/python independent/transcribe.py independent/exported-mode
 
 ### safetensors 转换一致性（2026-11-15）
 
-本机提取并转换后，1,314 个张量的 dtype、shape、字节内容逐一一致。使用同样两段合成语音和两秒静音比较两种加载路径：
+非流式三个子模型的 1,314 个张量已逐一核对 dtype、shape 和字节内容；后续完整导出九个子模型，共 2,780 个张量也全部通过同样校验。使用同样两段合成语音和两秒静音比较两种加载路径：
 
 | 样本 | 生成 token 数 | token ID / 原始文字 / 最终文字 | 编码器最大绝对误差 |
 |---|---:|---|---:|
@@ -80,6 +80,20 @@ independent/.venv/bin/python independent/transcribe.py independent/exported-mode
 safetensors 路径测试额外禁止读取所有 `.model` 文件，仍正常完成。另有 5 项无权重格式测试通过，覆盖损坏文件、缺失资产、版本检查等。以上证明本次转换保持已有 MLX 路径行为，不表示与豆包原库逐算子等价，也不代表真人准确率评测。
 
 [导出格式、可复现验证命令与迁移说明](independent/SAFETENSORS.md)。公开提交只包含代码和说明，不包含导出目录、词表、提示模板或权重。
+
+## 复制到未安装豆包的 Mac
+
+[独立部署指南](independent/DEPLOYMENT.md)提供部署目录生成、目标机器安装和完全离线安装方法：
+
+```sh
+independent/.venv/bin/python independent/package.py \
+  --model independent/exported-model \
+  --output /path/to/doubao-mlx-portable
+```
+
+复制部署目录到兼容的 Apple Silicon Mac，重新创建虚拟环境并安装依赖后即可运行，无需安装豆包。不能直接搬运原 `.venv`；目标机器仍需要兼容的 Python 和 macOS。若目标机完全不能联网，可在源机器准备 wheel 一同携带。
+
+已通过同机隔离部署：新目录、新虚拟环境、禁网离线安装，并禁止读取原项目、豆包和 FLUTE 包，三段识别样本仍正常。完整九组件权重已导出，推理当前仍为非流式。尚未在另一台物理 Mac 上验证系统兼容性或麦克风权限。
 
 ## 原运行库版本与模型解析资料
 

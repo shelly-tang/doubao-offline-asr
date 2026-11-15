@@ -13,6 +13,14 @@ MODELS = {
     'decoder': 'asr/models/non_s_llm_decoder.pthlite',
     'embedding': 'asr/models/non_s_llm_embedding_logit.pthlite',
 }
+EXTRA_MODELS = {
+    'stream_encoder': 'asr/models/encoder.opt.stream.pthlite',
+    'stream_decoder': 'asr/models/llm_decoder.pthlite',
+    'stream_embedding': 'asr/models/llm_decoder_embeding_logit.pthlite',
+    'stream_position': 'asr/models/llm_decoder_embeding_wpe.pthlite',
+    'draft': 'asr/models/non_s_draft.pthlite',
+    'vad': 'vad/encoder/vad_v4.pth.pthlite',
+}
 ASSETS = {
     'config.yaml': 'config.yaml',
     'vocab.txt': 'asr/token/vocab.txt',
@@ -23,7 +31,10 @@ ASSETS = {
 }
 
 
-def export(pack_path, output):
+def export(pack_path, output, scope="all"):
+    if scope not in ("all", "nonstream"):
+        raise ValueError("scope must be all or nonstream")
+    selected_models = {**MODELS, **EXTRA_MODELS} if scope == "all" else MODELS
     output = Path(output).resolve()
     if output.exists():
         raise FileExistsError(f'Refusing to overwrite: {output}')
@@ -35,11 +46,11 @@ def export(pack_path, output):
         source = Pack(pack_path)
         config = {'format': FORMAT, 'version': VERSION,
                   'quantization': 'signed-int4-k8-low4-high4',
-                  'source_sha256': sha256(pack_path),
+                  'source_sha256': sha256(pack_path), 'scope': scope,
                   'models': {}, 'assets': {}, 'files': {}}
         tensor_count = 0
         try:
-            for label, name in MODELS.items():
+            for label, name in selected_models.items():
                 model = source.model(name)
                 weights, graph = label + '.safetensors', label + '.graph.json'
                 # Copies retain original shapes (including scalars), dtypes and bits.
@@ -80,16 +91,17 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--pack', type=Path, help='Existing local plaintext FLUTE v1 pack; omit to extract installed weights temporarily')
     ap.add_argument('--output', type=Path, default=Path(__file__).with_name('exported-model'))
+    ap.add_argument('--scope', choices=['all', 'nonstream'], default='all', help='Export all nine components (default), or only the three currently used for nonstream inference')
     args = ap.parse_args()
     if args.output.exists():
         ap.error('Output exists; choose a new directory (no overwrite)')
     if args.pack:
-        result = export(args.pack, args.output)
+        result = export(args.pack, args.output, args.scope)
     else:
         from extract import extract, APP, MODEL
         with tempfile.TemporaryDirectory(prefix='doubao-local-extract-') as tmp:
             pack = extract(APP, MODEL, Path(tmp) / 'plain.model')
-            result = export(pack, args.output)
+            result = export(pack, args.output, args.scope)
     print(json.dumps(result, indent=2))
 
 

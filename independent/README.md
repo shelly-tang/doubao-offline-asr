@@ -14,7 +14,7 @@ independent/.venv/bin/python -m pip install -r independent/requirements.txt
 independent/.venv/bin/python independent/export.py
 ```
 
-导出器只读取本机已安装的程序和模型文件，不执行其中代码。它检查 SHA-256，只支持此前分析的版本（模型目录 `1_8`）。默认从安装中提取临时包，导出约 470.8 MB 的 `independent/exported-model/` 后自动清理临时包；输出目录已存在会拒绝覆盖。运行只需导出目录、代码和 Python 依赖，不再需要 FLUTE 包或原始安装目录。
+导出器只读取本机已安装的程序和模型文件，不执行其中代码。它检查 SHA-256，只支持此前分析的版本（模型目录 `1_8`）。默认从安装中提取临时包，默认完整导出约 824.9 MB 的 `independent/exported-model/` 后自动清理临时包；输出目录已存在会拒绝覆盖。运行只需导出目录、代码和 Python 依赖，不再需要 FLUTE 包或原始安装目录。
 
 已持有旧版 plaintext pack 的用户也可运行：
 
@@ -22,7 +22,9 @@ independent/.venv/bin/python independent/export.py
 independent/.venv/bin/python independent/export.py --pack independent/plain.model
 ```
 
-[完整 safetensors 格式与验证说明](SAFETENSORS.md)。
+[完整 safetensors 格式与验证说明](SAFETENSORS.md)。默认包含全部九个子模型；`--scope nonstream` 可选择约 470.8 MB 的三组件子集。完整导出不等于实现流式推理，当前录音路径仍为非流式。
+
+[复制到未安装豆包的 Mac：部署说明](DEPLOYMENT.md)。
 
 录音界面：
 
